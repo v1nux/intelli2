@@ -298,27 +298,42 @@ def _compute_feedback_score(total_minutes, focus_minutes, break_count,
     # Factor 1: Focus Ratio (0-40 points)
     if total_minutes > 0:
         focus_ratio = focus_minutes / total_minutes
-        score += focus_ratio * 40
+        
+        # Penalize focus score if they cannot maintain flow state
+        # (e.g. taking a break before completing even 10 minutes of continuous focus)
+        avg_focus_stretch = focus_minutes / (break_count + 1)
+        if avg_focus_stretch < 10 and break_count > 0:
+            score += focus_ratio * 10  # Severe penalty for micro-fragmented focus
+        else:
+            score += focus_ratio * 40
     else:
         score += 20  # Neutral
 
-    # Factor 2: Break Pattern (0-20 points)
-    # Dataset shows 1-5 breaks typical. 2-4 is optimal for productivity.
+    # Factor 2: Break Pattern (-20 to 20 points)
+    # We evaluate the rate of breaks (breaks per hour) to prevent abuse in short sessions
+    breaks_per_hour = break_count / (total_minutes / 60) if total_minutes > 0 else 0
+    
     if break_count == 0:
-        score += 8   # No breaks — could be bad or very focused short session
-    elif 1 <= break_count <= 2:
-        score += 14
-    elif 3 <= break_count <= 4:
-        score += 20  # Optimal
-    elif break_count == 5:
-        score += 15
+        if total_minutes < 60:
+            score += 15  # Good for short sprints
+        else:
+            score += 8   # Bad to not take breaks during long sessions
+    elif breaks_per_hour <= 1.0:
+        score += 20  # Optimal (up to 1 break per hour)
+    elif breaks_per_hour <= 2.0:
+        score += 10  # Slightly frequent
+    elif breaks_per_hour <= 3.0:
+        score += 0   # Very frequent
     else:
-        score += 10  # Too many breaks
+        score -= 20  # Highly distracted (>3 breaks per hour)
 
     # Factor 3: Time Management (0-25 points)
-    # Being on track or slightly under target is best
     if late_task_ratio == 0:
-        score += 25
+        # Only award full points if they've actually made meaningful progress
+        if target_minutes > 0 and (total_minutes / target_minutes) < 0.2:
+            score += 10  # Session barely started, neutral score
+        else:
+            score += 25
     elif late_task_ratio < 0.1:
         score += 20
     elif late_task_ratio < 0.2:

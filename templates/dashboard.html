@@ -1,4 +1,107 @@
 <!DOCTYPE html>
-<html><head><title>IntelliBreak - Dashboard</title></head>
-<body><h1>Dashboard (placeholder — frontend coming next)</h1></body>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>IntelliBreak | Dashboard</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+    <div class="dashboard-container">
+        <!-- Header -->
+        <header class="header">
+            <h1>IntelliBreak Dashboard</h1>
+            <div class="user-info">
+                <span id="userGreeting" style="font-weight: 500;">Hello, User</span>
+                <button id="logoutBtn" class="btn" style="background: rgba(255,255,255,0.1); color: white;">Logout</button>
+            </div>
+        </header>
+
+        <!-- Setup Panel (Visible when no session is active) -->
+        <div id="setupPanel" class="glass-panel panel" style="max-width: 600px; margin: 0 auto;">
+            <div class="panel-header">
+                <h2>Start a Focus Session</h2>
+            </div>
+            <form id="startForm">
+                <div class="input-group">
+                    <label for="activityType">Activity Type</label>
+                    <input type="text" id="activityType" placeholder="e.g., Coding, Writing, Studying" required>
+                </div>
+                <div class="input-group">
+                    <label for="targetDuration">Target Duration (Minutes)</label>
+                    <input type="number" id="targetDuration" min="1" value="60" required>
+                </div>
+                <button type="submit" class="btn btn-primary btn-block" style="margin-top: 1rem;">Start Session</button>
+            </form>
+        </div>
+
+        <!-- Active Session Panel (Visible when session is running) -->
+        <div id="activePanel" class="hidden">
+            <div class="grid grid-cols-3">
+                
+                <!-- Main Timer & Control Area -->
+                <div class="col-span-2 glass-panel panel" style="text-align: center;">
+                    <h2 id="sessionStatus" style="color: var(--secondary);">Status: ACTIVE FOCUS</h2>
+                    
+                    <div id="timerDisplay" class="timer-display">
+                        00:00:00
+                    </div>
+                    
+                    <div class="session-controls" style="justify-content: center; max-width: 400px; margin: 0 auto;">
+                        <button id="breakBtn" class="btn btn-success btn-block">Take a Break</button>
+                        <button id="endBtn" class="btn btn-danger btn-block">End Session</button>
+                    </div>
+
+                    <!-- AI Recommendation Box -->
+                    <div class="recommendation-box" style="text-align: left;">
+                        <h3 style="margin-bottom: 0.5rem; display: flex; align-items: center; gap: 0.5rem;">
+                            ✨ AI Insight
+                        </h3>
+                        <h4 id="recommendationTitle">Start a session to get insights</h4>
+                        <ul id="recommendationList" class="tips-list"></ul>
+                    </div>
+                </div>
+
+                <!-- Live ML Stats -->
+                <div class="glass-panel panel">
+                    <h3 style="margin-bottom: 1.5rem;">Live Prediction Analytics</h3>
+                    
+                    <div class="grid" style="grid-template-columns: 1fr;">
+                        <div class="stat-card glass-panel" style="background: rgba(15, 23, 42, 0.4);">
+                            <div class="stat-label">Predicted Productivity</div>
+                            <div id="currentPrediction" class="stat-value" style="font-size: 2rem;">-</div>
+                        </div>
+
+                        <div class="stat-card glass-panel" style="background: rgba(15, 23, 42, 0.4);">
+                            <div class="stat-label">Focus Score</div>
+                            <div id="focusScore" class="stat-value" style="font-size: 2rem;">0</div>
+                        </div>
+                        
+                        <div class="stat-card glass-panel" style="background: rgba(15, 23, 42, 0.4);">
+                            <div class="stat-label">Breaks Taken</div>
+                            <div id="breakCount" class="stat-value" style="font-size: 2rem;">0</div>
+                        </div>
+                        
+                        <div style="margin-top: 1rem;">
+                            <div style="display: flex; justify-content: space-between; margin-bottom: 0.5rem;">
+                                <span class="stat-label">Burnout Risk:</span>
+                                <span id="burnoutRisk" style="font-weight: 600; color: var(--warning);">Unknown</span>
+                            </div>
+                            <div style="display: flex; justify-content: space-between;">
+                                <span class="stat-label">WLB Status:</span>
+                                <span id="wlbStatus" style="font-weight: 600;">Unknown</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+    </div>
+
+    <div id="toast" class="toast"></div>
+
+    <script src="{{ url_for('static', filename='app.js') }}"></script>
+</body>
 </html>
