@@ -14,7 +14,7 @@
             <h1>IntelliBreak Dashboard</h1>
             <div class="user-info">
                 <span id="userGreeting" style="font-weight: 500;">Hello, User</span>
-                <button id="logoutBtn" class="btn" style="background: rgba(255,255,255,0.1); color: white;">Logout</button>
+                <button id="logoutBtn" class="btn btn-danger">Logout</button>
             </div>
         </header>
 
@@ -53,14 +53,7 @@
                         <button id="endBtn" class="btn btn-danger btn-block">End Session</button>
                     </div>
 
-                    <!-- AI Recommendation Box -->
-                    <div class="recommendation-box" style="text-align: left;">
-                        <h3 style="margin-bottom: 0.5rem; display: flex; align-items: center; gap: 0.5rem;">
-                            ✨ AI Insight
-                        </h3>
-                        <h4 id="recommendationTitle">Start a session to get insights</h4>
-                        <ul id="recommendationList" class="tips-list"></ul>
-                    </div>
+
                 </div>
 
                 <!-- Live ML Stats -->
@@ -68,17 +61,17 @@
                     <h3 style="margin-bottom: 1.5rem;">Live Prediction Analytics</h3>
                     
                     <div class="grid" style="grid-template-columns: 1fr;">
-                        <div class="stat-card glass-panel" style="background: rgba(15, 23, 42, 0.4);">
+                        <div class="stat-card glass-panel">
                             <div class="stat-label">Predicted Productivity</div>
                             <div id="currentPrediction" class="stat-value" style="font-size: 2rem;">-</div>
                         </div>
 
-                        <div class="stat-card glass-panel" style="background: rgba(15, 23, 42, 0.4);">
+                        <div class="stat-card glass-panel">
                             <div class="stat-label">Focus Score</div>
                             <div id="focusScore" class="stat-value" style="font-size: 2rem;">0</div>
                         </div>
                         
-                        <div class="stat-card glass-panel" style="background: rgba(15, 23, 42, 0.4);">
+                        <div class="stat-card glass-panel">
                             <div class="stat-label">Breaks Taken</div>
                             <div id="breakCount" class="stat-value" style="font-size: 2rem;">0</div>
                         </div>

@@ -49,6 +49,30 @@ async function login(event) {
     }
 }
 
+async function register(event) {
+    event.preventDefault();
+    const full_name = document.getElementById('reg-fullname').value;
+    const username = document.getElementById('reg-username').value;
+    const password = document.getElementById('reg-password').value;
+    
+    try {
+        const response = await fetch(`${API_BASE}/auth/register`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ full_name, username, password })
+        });
+        
+        const data = await response.json();
+        if (response.ok) {
+            window.location.href = '/dashboard';
+        } else {
+            showToast(data.error || 'Registration failed', 'error');
+        }
+    } catch (err) {
+        showToast('Connection error', 'error');
+    }
+}
+
 async function logout() {
     try {
         await fetch(`${API_BASE}/auth/logout`, { method: 'POST' });
@@ -157,8 +181,6 @@ async function endSession() {
             document.getElementById('currentPrediction').className = 'stat-value';
             document.getElementById('focusScore').textContent = '0';
             document.getElementById('breakCount').textContent = '0';
-            document.getElementById('recommendationTitle').textContent = 'Start a session to get insights';
-            document.getElementById('recommendationList').innerHTML = '';
             
         } else {
             showToast(data.error || 'Failed to end session', 'error');
@@ -289,18 +311,6 @@ function updateDashboardStats(data) {
         
     document.getElementById('breakCount').textContent = 
         data.features.break_frequency_per_day;
-        
-    // Recommendation
-    document.getElementById('recommendationTitle').textContent = 
-        data.recommendation.main_recommendation;
-        
-    const listEl = document.getElementById('recommendationList');
-    listEl.innerHTML = '';
-    data.recommendation.tips.forEach(tip => {
-        const li = document.createElement('li');
-        li.textContent = tip;
-        listEl.appendChild(li);
-    });
     
     // Burnout & WLB
     document.getElementById('burnoutRisk').textContent = data.recommendation.burnout_risk;
@@ -335,5 +345,11 @@ document.addEventListener('DOMContentLoaded', () => {
     if (window.location.pathname === '/login' || window.location.pathname === '/') {
         const loginForm = document.getElementById('loginForm');
         if (loginForm) loginForm.addEventListener('submit', login);
+    }
+
+    // If on register page
+    if (window.location.pathname === '/register') {
+        const registerForm = document.getElementById('registerForm');
+        if (registerForm) registerForm.addEventListener('submit', register);
     }
 });

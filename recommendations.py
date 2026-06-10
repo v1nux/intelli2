@@ -108,7 +108,7 @@ def _high_productivity_rec(patterns):
         "tips": tips[:4],
         "expected_benefits": benefits,
         "work_life_balance": _assess_work_life_balance(patterns),
-        "burnout_risk": "Low" if not patterns.get("overworking") else "Moderate"
+        "burnout_risk": _assess_burnout_risk(patterns)
     }
 
 
@@ -163,7 +163,7 @@ def _medium_productivity_rec(patterns):
         "tips": tips[:4],
         "expected_benefits": benefits,
         "work_life_balance": _assess_work_life_balance(patterns),
-        "burnout_risk": "Moderate" if patterns.get("overworking") else "Low"
+        "burnout_risk": _assess_burnout_risk(patterns)
     }
 
 
@@ -227,7 +227,7 @@ def _low_productivity_rec(patterns):
         "tips": tips[:4],
         "expected_benefits": benefits,
         "work_life_balance": _assess_work_life_balance(patterns),
-        "burnout_risk": "High" if patterns.get("overworking") else "Moderate"
+        "burnout_risk": _assess_burnout_risk(patterns)
     }
 
 
@@ -257,3 +257,35 @@ def _assess_work_life_balance(patterns):
             "message": "Your work-life balance is acceptable but could be improved "
                       "with more structured break patterns."
         }
+
+def _assess_burnout_risk(patterns):
+    """
+    Calculate burnout risk using a multi-factor score instead of just work hours.
+    Factors:
+    - Overworking (+3 risk)
+    - No breaks (+2 risk) or Few breaks (+1 risk)
+    - Behind schedule (+1 risk)
+    - Low feedback score (+1 risk)
+    """
+    risk_score = 0
+    
+    if patterns.get("overworking"):
+        risk_score += 3
+        
+    if patterns.get("no_breaks"):
+        risk_score += 2
+    elif patterns.get("few_breaks"):
+        risk_score += 1
+        
+    if patterns.get("behind_schedule"):
+        risk_score += 1
+        
+    if patterns.get("low_feedback"):
+        risk_score += 1
+        
+    if risk_score >= 4:
+        return "High"
+    elif risk_score >= 2:
+        return "Moderate"
+    else:
+        return "Low"

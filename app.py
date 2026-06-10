@@ -3,7 +3,7 @@ IntelliBreak — Flask API Server
 Main application entry point with all REST API routes.
 """
 
-from flask import Flask, request, jsonify, session, render_template, redirect, url_for
+from flask import Flask, request, jsonify, session, render_template, redirect, url_for, make_response
 from flask_cors import CORS
 from functools import wraps
 import os
@@ -16,9 +16,25 @@ import recommendations as rec
 # App Configuration
 # =========================================
 
+import logging
+logging.basicConfig(level=logging.DEBUG, format='%(asctime)s - %(levelname)s - %(message)s')
+
 app = Flask(__name__)
 app.secret_key = "intellibreak-dev-secret-key-2025"
 CORS(app, supports_credentials=True)
+
+@app.before_request
+def log_request_info():
+    if request.path.startswith('/api/predict') or request.path == '/api/sessions/end':
+        app.logger.debug('Request Path: %s Method: %s', request.path, request.method)
+        app.logger.debug('Headers: %s', request.headers)
+        app.logger.debug('Body: %s', request.get_data())
+
+@app.after_request
+def log_response_info(response):
+    if request.path.startswith('/api/predict') or request.path == '/api/sessions/end':
+        app.logger.debug('Response Status: %s', response.status)
+    return response
 
 
 # =========================================
@@ -51,11 +67,22 @@ def login_page():
     return render_template("login.html")
 
 
+@app.route("/register")
+def register_page():
+    if "user_id" in session:
+        return redirect(url_for("dashboard_page"))
+    return render_template("register.html")
+
+
 @app.route("/dashboard")
 def dashboard_page():
     if "user_id" not in session:
         return redirect(url_for("login_page"))
-    return render_template("dashboard.html")
+    response = make_response(render_template("dashboard.html"))
+    response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
+    response.headers["Pragma"] = "no-cache"
+    response.headers["Expires"] = "-1"
+    return response
 
 
 # =========================================
@@ -111,7 +138,7 @@ def login():
         return jsonify({"error": "Username and password are required"}), 400
 
     user = db.get_user_by_username(username)
-    if not user or user["password"] != password:
+    if not user or not db.verify_password(user, password):
         return jsonify({"error": "Invalid username or password"}), 401
 
     session["user_id"] = user["id"]
@@ -201,8 +228,11 @@ def end_session():
     # Get breaks for feature computation
     breaks = db.get_session_breaks(active["id"])
 
+    # Fetch total daily work hours from other completed sessions today
+    daily_hours = db.get_daily_work_hours(user_id, exclude_session_id=active["id"])
+
     # Compute features from the completed session
-    features = ml_engine.compute_features_from_session(ended_session, breaks)
+    features = ml_engine.compute_features_from_session(ended_session, breaks, daily_work_hours=daily_hours)
 
     # Get ML prediction
     prediction = ml_engine.predict(features)
@@ -328,8 +358,11 @@ def predict_live():
 
     breaks = db.get_session_breaks(active["id"])
 
+    # Fetch total daily work hours from other completed sessions today
+    daily_hours = db.get_daily_work_hours(user_id, exclude_session_id=active["id"])
+
     # Compute current features from live session data
-    features = ml_engine.compute_features_from_session(active, breaks)
+    features = ml_engine.compute_features_from_session(active, breaks, daily_work_hours=daily_hours)
 
     # Get prediction from all models
     prediction = ml_engine.predict(features)
@@ -340,18 +373,20 @@ def predict_live():
     )
 
     # Save as a 'live' prediction (for tracking purposes)
-    db.save_prediction(
-        session_id=active["id"],
-        user_id=user_id,
-        prediction_type="live",
-        rf_pred=prediction["predictions"]["random_forest"],
-        dt_pred=prediction["predictions"]["decision_tree"],
-        knn_pred=prediction["predictions"]["knn"],
-        best_pred=prediction["best_prediction"],
-        best_algo=prediction["best_algorithm"],
-        features=features,
-        recommendation=recommendation["main_recommendation"]
-    )
+    # Rate-limit to avoid bloating the database if called frequently (e.g. every 5 seconds)
+    if not db.has_recent_live_prediction(active["id"], interval_seconds=30):
+        db.save_prediction(
+            session_id=active["id"],
+            user_id=user_id,
+            prediction_type="live",
+            rf_pred=prediction["predictions"]["random_forest"],
+            dt_pred=prediction["predictions"]["decision_tree"],
+            knn_pred=prediction["predictions"]["knn"],
+            best_pred=prediction["best_prediction"],
+            best_algo=prediction["best_algorithm"],
+            features=features,
+            recommendation=recommendation["main_recommendation"]
+        )
 
     return jsonify({
         "active": True,

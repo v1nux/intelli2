@@ -51,15 +51,11 @@ def _train_all_models():
     global _models, _scaler, _accuracies, _reports, _confusion_matrices
     global _best_model_name, _is_trained
 
-    print("[ML] Loading dataset...")
     df = pd.read_csv(DATASET_PATH)
-    print(f"[ML] Dataset loaded: {len(df)} rows, {len(df.columns)} columns")
 
     # Select features and target
     X = df[FEATURE_COLUMNS].copy()
     y = df[TARGET_COLUMN].copy()
-
-    print(f"[ML] Label distribution:\n{y.value_counts().to_string()}")
 
     # Split data
     X_train, X_test, y_train, y_test = train_test_split(
@@ -86,7 +82,6 @@ def _train_all_models():
 
     # Train and evaluate each model
     for name, model in model_configs.items():
-        print(f"\n[ML] Training {name}...")
 
         # KNN benefits from scaling; RF and DT are scale-invariant
         if name == "KNN":
@@ -105,26 +100,14 @@ def _train_all_models():
         _reports[name] = report
         _confusion_matrices[name] = cm.tolist()
 
-        print(f"[ML] {name} Accuracy: {_accuracies[name]}%")
-
     # Determine best model
     _best_model_name = max(_accuracies, key=_accuracies.get)
-    print(f"\n[ML] Best model: {_best_model_name} ({_accuracies[_best_model_name]}%)")
 
     _is_trained = True
-    print("[ML] All models trained successfully!\n")
 
 
 def predict(features_dict):
-    """
-    Predict productivity label using all 3 models.
 
-    Args:
-        features_dict: dict with keys matching FEATURE_COLUMNS
-
-    Returns:
-        dict with predictions from each model, best prediction, and features used
-    """
     if not _is_trained:
         raise RuntimeError("Models not trained yet. Call init() first.")
 
@@ -165,12 +148,7 @@ def predict(features_dict):
 
 
 def get_model_comparison():
-    """
-    Get accuracy comparison across all models.
 
-    Returns:
-        dict with accuracies, classification reports, confusion matrices
-    """
     if not _is_trained:
         raise RuntimeError("Models not trained yet.")
 
@@ -202,19 +180,9 @@ def get_model_comparison():
     }
 
 
-def compute_features_from_session(session_data, breaks_data):
-    """
-    Compute the 5 ML input features from live session data.
-    Auto-computes the feedback score based on session behavior patterns.
+def compute_features_from_session(session_data, breaks_data, daily_work_hours=None):
 
-    Args:
-        session_data: dict from database session row
-        breaks_data: list of break dicts
-
-    Returns:
-        dict with the 5 features
-    """
-    from datetime import datetime
+    from datetime import datetime, timezone
 
     start_time = datetime.fromisoformat(session_data["start_time"])
 
@@ -222,7 +190,7 @@ def compute_features_from_session(session_data, breaks_data):
     if session_data.get("end_time"):
         end_time = datetime.fromisoformat(session_data["end_time"])
     else:
-        end_time = datetime.utcnow()
+        end_time = datetime.now(timezone.utc).replace(tzinfo=None)
 
     total_seconds = (end_time - start_time).total_seconds()
     total_minutes = total_seconds / 60.0
@@ -234,9 +202,16 @@ def compute_features_from_session(session_data, breaks_data):
         total_hours = total_minutes / 60.0
 
     # --- Feature 1: Average Daily Work Hours ---
-    avg_daily_work_hours = round(total_hours, 2)
-    # Clamp to realistic range (dataset range: ~3.6 - 11.3)
-    avg_daily_work_hours = max(0.1, min(12.0, avg_daily_work_hours))
+    # Use daily aggregate (other completed sessions today + current session)
+    # to match the dataset's "average_daily_work_hours" semantics (~3.5–11.3 range).
+    # Without aggregation, a 30-min session would produce 0.5 hours — far outside
+    # the training range, causing unreliable model extrapolation.
+    if daily_work_hours is not None:
+        avg_daily_work_hours = round(daily_work_hours + total_hours, 2)
+    else:
+        avg_daily_work_hours = round(total_hours, 2)
+    # Clamp to dataset range to prevent model extrapolation into unseen territory
+    avg_daily_work_hours = max(3.5, min(12.0, avg_daily_work_hours))
 
     # --- Feature 2: Break Frequency Per Day ---
     break_count = len(breaks_data)
@@ -283,75 +258,68 @@ def compute_features_from_session(session_data, breaks_data):
 
 def _compute_feedback_score(total_minutes, focus_minutes, break_count,
                             late_task_ratio, target_minutes):
-    """
-    Auto-compute a feedback score (50-100) based on session behavior.
-    This replaces the manual slider input.
 
-    Scoring factors:
-    - Focus ratio (40% weight): How much of session time was focused work
-    - Break pattern (20% weight): Taking moderate breaks is positive
-    - Time management (25% weight): Finishing on time / not too much overtime
-    - Consistency (15% weight): Session length relative to target
-    """
     score = 50.0  # Base score
 
-    # Factor 1: Focus Ratio (0-40 points)
+    # Factor 1: Focus Ratio (0-18 points)
     if total_minutes > 0:
         focus_ratio = focus_minutes / total_minutes
-        
-        # Penalize focus score if they cannot maintain flow state
-        # (e.g. taking a break before completing even 10 minutes of continuous focus)
+
+        # Penalize micro-fragmented focus (breaking before 10 min of continuous work)
         avg_focus_stretch = focus_minutes / (break_count + 1)
         if avg_focus_stretch < 10 and break_count > 0:
-            score += focus_ratio * 10  # Severe penalty for micro-fragmented focus
+            score += focus_ratio * 5
         else:
-            score += focus_ratio * 40
+            score += focus_ratio * 18
     else:
-        score += 20  # Neutral
+        score += 9  # Neutral
 
-    # Factor 2: Break Pattern (-20 to 20 points)
-    # We evaluate the rate of breaks (breaks per hour) to prevent abuse in short sessions
-    breaks_per_hour = break_count / (total_minutes / 60) if total_minutes > 0 else 0
-    
+    # Factor 2: Break Pattern (0-12 points)
+    # Evaluate breaks per hour to normalize across session lengths
+    if total_minutes > 0:
+        breaks_per_hour = break_count / (total_minutes / 60)
+    else:
+        breaks_per_hour = 0
+
     if break_count == 0:
         if total_minutes < 60:
-            score += 15  # Good for short sprints
+            score += 8   # Acceptable for short sprints
         else:
-            score += 8   # Bad to not take breaks during long sessions
+            score += 4   # Should take breaks in longer sessions
     elif breaks_per_hour <= 1.0:
-        score += 20  # Optimal (up to 1 break per hour)
+        score += 12  # Optimal (up to 1 break per hour)
     elif breaks_per_hour <= 2.0:
-        score += 10  # Slightly frequent
+        score += 8   # Slightly frequent
     elif breaks_per_hour <= 3.0:
-        score += 0   # Very frequent
+        score += 4   # Very frequent
     else:
-        score -= 20  # Highly distracted (>3 breaks per hour)
+        score += 1   # Highly distracted (>3 breaks/hour)
 
-    # Factor 3: Time Management (0-25 points)
+    # Factor 3: Time Management (0-12 points)
     if late_task_ratio == 0:
-        # Only award full points if they've actually made meaningful progress
+        # Only award full points if meaningful progress has been made
         if target_minutes > 0 and (total_minutes / target_minutes) < 0.2:
-            score += 10  # Session barely started, neutral score
+            score += 6   # Session barely started, neutral score
         else:
-            score += 25
+            score += 12
     elif late_task_ratio < 0.1:
-        score += 20
-    elif late_task_ratio < 0.2:
-        score += 15
-    elif late_task_ratio < 0.3:
         score += 10
+    elif late_task_ratio < 0.2:
+        score += 7
+    elif late_task_ratio < 0.3:
+        score += 4
     else:
-        score += 5
+        score += 2
 
-    # Factor 4: Session Consistency (0-15 points)
+    # Factor 4: Session Consistency (0-8 points)
     if target_minutes > 0:
         completion_ratio = total_minutes / target_minutes
         if 0.8 <= completion_ratio <= 1.2:
-            score += 15  # Hit the target window
+            score += 8   # Hit the target window
         elif 0.5 <= completion_ratio <= 1.5:
-            score += 10
-        else:
             score += 5
+        else:
+            score += 2
 
     # Clamp to dataset range (50-100)
     return int(max(50, min(100, round(score))))

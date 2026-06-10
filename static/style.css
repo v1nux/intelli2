@@ -1,19 +1,19 @@
 :root {
-    --primary: #4F46E5;
-    --primary-hover: #4338CA;
+    --primary: #000000;
+    --primary-hover: #333333;
     --secondary: #10B981;
     --secondary-hover: #059669;
     --danger: #EF4444;
     --danger-hover: #DC2626;
     --warning: #F59E0B;
-    --bg-color: #0F172A;
-    --glass-bg: rgba(30, 41, 59, 0.7);
-    --glass-border: rgba(255, 255, 255, 0.1);
-    --text-main: #F8FAFC;
-    --text-muted: #94A3B8;
-    --shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
-    --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
-    
+    --bg-color: #FAFAFA;
+    --panel-bg: #FFFFFF;
+    --border-color: #E5E7EB;
+    --text-main: #111827;
+    --text-muted: #6B7280;
+    --shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+    --shadow-lg: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+
     /* Productivity levels */
     --prod-high: #10B981;
     --prod-medium: #F59E0B;
@@ -29,28 +29,25 @@
 
 body {
     background-color: var(--bg-color);
-    background-image: 
-        radial-gradient(circle at 15% 50%, rgba(79, 70, 229, 0.15) 0%, transparent 50%),
-        radial-gradient(circle at 85% 30%, rgba(16, 185, 129, 0.15) 0%, transparent 50%);
-    background-attachment: fixed;
     color: var(--text-main);
     min-height: 100vh;
     display: flex;
     flex-direction: column;
 }
 
-/* Glassmorphism Utilities */
+/* Minimal Utilities */
 .glass-panel {
-    background: var(--glass-bg);
-    backdrop-filter: blur(12px);
-    -webkit-backdrop-filter: blur(12px);
-    border: 1px solid var(--glass-border);
-    border-radius: 16px;
-    box-shadow: var(--shadow-lg);
+    background: var(--panel-bg);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    box-shadow: var(--shadow);
 }
 
 /* Typography */
-h1, h2, h3, h4 {
+h1,
+h2,
+h3,
+h4 {
     font-weight: 600;
     letter-spacing: -0.025em;
     margin-bottom: 0.5rem;
@@ -58,9 +55,7 @@ h1, h2, h3, h4 {
 
 h1 {
     font-size: 2.25rem;
-    background: linear-gradient(to right, #60A5FA, #34D399);
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
+    color: var(--text-main);
 }
 
 p {
@@ -81,21 +76,23 @@ p {
     color: var(--text-muted);
 }
 
-input, select {
+input,
+select {
     width: 100%;
     padding: 0.75rem 1rem;
-    background: rgba(15, 23, 42, 0.6);
-    border: 1px solid var(--glass-border);
-    border-radius: 8px;
+    background: #FFFFFF;
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
     color: var(--text-main);
     font-size: 1rem;
     transition: all 0.2s ease;
 }
 
-input:focus, select:focus {
+input:focus,
+select:focus {
     outline: none;
     border-color: var(--primary);
-    box-shadow: 0 0 0 2px rgba(79, 70, 229, 0.2);
+    box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.1);
 }
 
 /* Buttons */
@@ -174,7 +171,7 @@ input:focus, select:focus {
     align-items: center;
     margin-bottom: 2rem;
     padding-bottom: 1rem;
-    border-bottom: 1px solid var(--glass-border);
+    border-bottom: 1px solid var(--border-color);
 }
 
 .user-info {
@@ -226,7 +223,6 @@ input:focus, select:focus {
     left: 0;
     width: 4px;
     height: 100%;
-    background: var(--primary);
     border-radius: 4px 0 0 4px;
 }
 
@@ -284,8 +280,15 @@ input:focus, select:focus {
 }
 
 @keyframes pulse {
-    0%, 100% { opacity: 1; }
-    50% { opacity: .5; }
+
+    0%,
+    100% {
+        opacity: 1;
+    }
+
+    50% {
+        opacity: .5;
+    }
 }
 
 /* Session Controls */
@@ -301,22 +304,19 @@ input:focus, select:focus {
     font-variant-numeric: tabular-nums;
     text-align: center;
     margin: 2rem 0;
-    background: linear-gradient(135deg, #fff, #94a3b8);
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
+    color: var(--text-main);
 }
 
 /* Recommendation Box */
 .recommendation-box {
     margin-top: 1.5rem;
     padding: 1.5rem;
-    background: rgba(15, 23, 42, 0.4);
-    border-radius: 12px;
-    border-left: 4px solid var(--primary);
+    background: #F9FAFB;
+    border-radius: 8px;
 }
 
 .recommendation-box h4 {
-    color: #fff;
+    color: var(--text-main);
     margin-bottom: 0.5rem;
 }
 
@@ -353,13 +353,12 @@ input:focus, select:focus {
     position: fixed;
     bottom: 20px;
     right: 20px;
-    background: var(--glass-bg);
-    backdrop-filter: blur(10px);
-    border-left: 4px solid var(--primary);
+    background: var(--panel-bg);
+    border: 1px solid var(--border-color);
     padding: 1rem 1.5rem;
-    border-radius: 8px;
+    border-radius: 6px;
     box-shadow: var(--shadow-lg);
-    color: white;
+    color: var(--text-main);
     z-index: 1000;
     transform: translateY(100px);
     opacity: 0;
@@ -371,13 +370,6 @@ input:focus, select:focus {
     opacity: 1;
 }
 
-.toast.error {
-    border-left-color: var(--danger);
-}
-
-.toast.success {
-    border-left-color: var(--secondary);
-}
 
 .hidden {
     display: none !important;

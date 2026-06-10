@@ -5,9 +5,15 @@ SQLite persistence for users, sessions, breaks, and predictions.
 
 import sqlite3
 import os
-from datetime import datetime
+from datetime import datetime, timezone
+from werkzeug.security import generate_password_hash, check_password_hash
 
 DB_PATH = os.path.join(os.path.dirname(__file__), "intellibreak.db")
+
+
+def _utcnow():
+    """Get current UTC time (naive) without using deprecated utcnow()."""
+    return datetime.now(timezone.utc).replace(tzinfo=None)
 
 
 def get_connection():
@@ -96,7 +102,7 @@ def create_user(username, password, full_name):
         cursor = conn.cursor()
         cursor.execute(
             "INSERT INTO users (username, password, full_name) VALUES (?, ?, ?)",
-            (username, password, full_name)
+            (username, generate_password_hash(password), full_name)
         )
         conn.commit()
         user_id = cursor.lastrowid
@@ -128,6 +134,18 @@ def get_user_by_id(user_id):
     return dict(row) if row else None
 
 
+def verify_password(user, password):
+    """Verify a password against the stored hash. Supports legacy plaintext for migration."""
+    if not user or not user.get("password"):
+        return False
+    stored = user["password"]
+    # Support hashed passwords (werkzeug format)
+    if stored.startswith("scrypt:") or stored.startswith("pbkdf2:"):
+        return check_password_hash(stored, password)
+    # Legacy plaintext comparison (for existing accounts before hashing was added)
+    return stored == password
+
+
 # =========================================
 # Session Operations
 # =========================================
@@ -135,7 +153,7 @@ def get_user_by_id(user_id):
 def create_session(user_id, activity_type, target_duration_minutes):
     """Start a new focus session."""
     conn = get_connection()
-    now = datetime.utcnow().isoformat()
+    now = _utcnow().isoformat()
     cursor = conn.cursor()
     cursor.execute(
         """INSERT INTO sessions
@@ -181,7 +199,7 @@ def end_session(session_id):
         conn.close()
         return None
 
-    now = datetime.utcnow()
+    now = _utcnow()
     start = datetime.fromisoformat(session["start_time"])
     total_minutes = (now - start).total_seconds() / 60.0
 
@@ -253,7 +271,7 @@ def get_user_sessions(user_id, limit=50):
 def start_break(session_id):
     """Start a break within a session."""
     conn = get_connection()
-    now = datetime.utcnow().isoformat()
+    now = _utcnow().isoformat()
     cursor = conn.cursor()
     cursor.execute(
         "INSERT INTO breaks (session_id, start_time) VALUES (?, ?)",
@@ -278,7 +296,7 @@ def end_break(session_id):
         conn.close()
         return None
 
-    now = datetime.utcnow()
+    now = _utcnow()
     b_start = datetime.fromisoformat(active["start_time"])
     duration = (now - b_start).total_seconds() / 60.0
 
@@ -413,6 +431,51 @@ def get_user_stats(user_id):
         "avg_focus_minutes": round(avg_focus, 2),
         "productivity_distribution": label_dist
     }
+
+
+def get_daily_work_hours(user_id, exclude_session_id=None):
+    """Get total work hours from completed sessions today (UTC), excluding a specific session."""
+    conn = get_connection()
+    today = _utcnow().strftime("%Y-%m-%d")
+
+    if exclude_session_id:
+        row = conn.execute(
+            """SELECT COALESCE(SUM(total_duration_minutes), 0) as total
+               FROM sessions
+               WHERE user_id = ? AND is_active = 0 AND id != ?
+               AND DATE(start_time) = ?""",
+            (user_id, exclude_session_id, today)
+        ).fetchone()
+    else:
+        row = conn.execute(
+            """SELECT COALESCE(SUM(total_duration_minutes), 0) as total
+               FROM sessions
+               WHERE user_id = ? AND is_active = 0
+               AND DATE(start_time) = ?""",
+            (user_id, today)
+        ).fetchone()
+
+    conn.close()
+    return round((row["total"] or 0) / 60.0, 2)
+
+
+def has_recent_live_prediction(session_id, interval_seconds=30):
+    """Check if a live prediction was saved recently for this session."""
+    conn = get_connection()
+    row = conn.execute(
+        """SELECT created_at FROM predictions
+           WHERE session_id = ? AND prediction_type = 'live'
+           ORDER BY id DESC LIMIT 1""",
+        (session_id,)
+    ).fetchone()
+    conn.close()
+
+    if not row or not row["created_at"]:
+        return False
+
+    last_time = datetime.fromisoformat(row["created_at"])
+    elapsed = (_utcnow() - last_time).total_seconds()
+    return elapsed < interval_seconds
 
 
 # Initialize on import
